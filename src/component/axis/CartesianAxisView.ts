@@ -78,7 +78,7 @@ class CartesianAxisView extends AxisView {
                 // Not show axisTick or axisLine if other axis is category / time
                 return false;
             }
-        } as AxisBuilderCfg, layout));
+        } as AxisBuilderCfg, layout), api);
 
         zrUtil.each(axisBuilderAttrs, axisBuilder.add, axisBuilder);
 

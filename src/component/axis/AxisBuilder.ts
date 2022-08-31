@@ -17,16 +17,16 @@
 * under the License.
 */
 
-import {retrieve, defaults, extend, each, isObject, map, isString, isNumber, isFunction} from 'zrender/src/core/util';
+import { retrieve, defaults, extend, each, isObject, map, isString, isNumber, isFunction } from 'zrender/src/core/util';
 import * as graphic from '../../util/graphic';
-import {getECData} from '../../util/innerStore';
-import {createTextStyle} from '../../label/labelStyle';
+import { getECData } from '../../util/innerStore';
+import { createTextStyle } from '../../label/labelStyle';
 import Model from '../../model/Model';
-import {isRadianAroundZero, remRadian} from '../../util/number';
-import {createSymbol, normalizeSymbolOffset} from '../../util/symbol';
+import { isRadianAroundZero, remRadian } from '../../util/number';
+import { createSymbol, normalizeSymbolOffset } from '../../util/symbol';
 import * as matrixUtil from 'zrender/src/core/matrix';
-import {applyTransform as v2ApplyTransform} from 'zrender/src/core/vector';
-import {shouldShowAllLabels} from '../../coord/axisHelper';
+import { applyTransform as v2ApplyTransform } from 'zrender/src/core/vector';
+import { shouldShowAllLabels } from '../../coord/axisHelper';
 import { AxisBaseModel } from '../../coord/AxisBaseModel';
 import { ZRTextVerticalAlign, ZRTextAlign, ECElement, ColorString } from '../../util/types';
 import { AxisBaseOption } from '../../coord/axisCommonTypes';
@@ -34,6 +34,7 @@ import Element from 'zrender/src/Element';
 import { PathStyleProps } from 'zrender/src/graphic/Path';
 import OrdinalScale from '../../scale/Ordinal';
 import { prepareLayoutList, hideOverlap } from '../../label/labelLayoutHelper';
+import ExtensionAPI from '../../core/ExtensionAPI';
 
 const PI = Math.PI;
 
@@ -49,10 +50,14 @@ type AxisEventData = {
     dataIndex?: number
     tickIndex?: number
 } & {
-    [key in AxisIndexKey]?: number
-};
+        [key in AxisIndexKey]?: number
+    };
 
 type AxisLabelText = graphic.Text & {
+    __fullText: string
+    __truncatedText: string
+} & ECElement;
+type AxisLabelGroup = graphic.Group & {
     __fullText: string
     __truncatedText: string
 } & ECElement;
@@ -132,7 +137,9 @@ class AxisBuilder {
 
     private _transformGroup: graphic.Group;
 
-    constructor(axisModel: AxisBaseModel, opt?: AxisBuilderCfg) {
+    private _api?: ExtensionAPI;
+
+    constructor(axisModel: AxisBaseModel, opt?: AxisBuilderCfg, api?: ExtensionAPI) {
 
         this.opt = opt;
 
@@ -165,6 +172,7 @@ class AxisBuilder {
         transformGroup.updateTransform();
 
         this._transformGroup = transformGroup;
+        this._api = api;
     }
 
     hasBuilder(name: keyof typeof builders) {
@@ -172,7 +180,7 @@ class AxisBuilder {
     }
 
     add(name: keyof typeof builders) {
-        builders[name](this.opt, this.axisModel, this.group, this._transformGroup);
+        builders[name](this.opt, this.axisModel, this.group, this._transformGroup, this._api);
     }
 
     getGroup() {
@@ -234,8 +242,9 @@ interface AxisElementsBuilder {
         opt: AxisBuilderCfg,
         axisModel: AxisBaseModel,
         group: graphic.Group,
-        transformGroup: graphic.Group
-    ):void
+        transformGroup: graphic.Group,
+        api?: ExtensionAPI,
+    ): void
 }
 
 const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBuilder> = {
@@ -364,7 +373,7 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
         }
     },
 
-    axisName(opt, axisModel, group, transformGroup) {
+    axisName(opt, axisModel, group, transformGroup, api?: ExtensionAPI) {
         const name = retrieve(opt.axisName, axisModel.get('name'));
 
         if (!name) {
@@ -376,16 +385,29 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
         const textStyleModel = axisModel.getModel('nameTextStyle');
         const gap = axisModel.get('nameGap') || 0;
 
+        // 需要提前计算好这些信息后面用做判断
+        // Y轴标签容器，用来计算标签左右侧起始位置
+        const boundingRect = group.getBoundingRect();
+        // 判断是否Y轴，X轴不需要启用文本竖直排列
+        const isY = axisModel.mainType === 'yAxis';
+        // 判断标签是在左侧还是在右侧
+        const labelHorizontalPosition = !(opt.tickDirection === 1);
+        // 判断是否需要文本竖直排列，只有文本居中排列的Y轴才需要
+        const needLabelVertical = isNameLocationCenter(nameLocation) && isY;
+        // 需要获取文字的大小以计算偏移位置
+        const fontSize: number = (textStyleModel.get('fontSize') as number) || 12;
         const extent = axisModel.axis.getExtent();
         const gapSignal = extent[0] > extent[1] ? -1 : 1;
         const pos = [
             nameLocation === 'start'
                 ? extent[0] - gapSignal * gap
                 : nameLocation === 'end'
-                ? extent[1] + gapSignal * gap
-                : (extent[0] + extent[1]) / 2, // 'middle'
-            // Reuse labelOffset.
-            isNameLocationCenter(nameLocation) ? opt.labelOffset + nameDirection * gap : 0
+                    ? extent[1] + gapSignal * gap
+                    : (extent[0] + extent[1]) / 2, // 'middle'
+            // 计算标签起始位置，默认Y轴刻度往左右各偏移一个字符的距离
+            needLabelVertical ? nameDirection * gap
+                + (labelHorizontalPosition ? -boundingRect.width : boundingRect.width + fontSize)
+                : isNameLocationCenter(nameLocation) ? opt.labelOffset + nameDirection * gap : 0
         ];
 
         let labelLayout;
@@ -426,51 +448,133 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
             opt.nameTruncateMaxWidth, truncateOpt.maxWidth, axisNameAvailableWidth
         );
 
-        const textEl = new graphic.Text({
-            x: pos[0],
+        /**
+         * 需要获取canvas对象用来计算文字的宽度和高度
+         * 第一次使用时因为canvas还没有创建，所以需要在dom中创建一个临时canvas，全部计算完后销毁
+         * 后面重新渲染时chart本身的canvas就能获取到了,也就不用重复创建canvas。
+         */
+        const dom = api?.getDom();
+        let canvas = dom?.querySelector('canvas');
+        if (!canvas) { // 第一次渲染时找不到canvas进行文字长度判断，判断完后干掉他
+            // eslint-disable-next-line no-undef
+            canvas = document.createElement('canvas');
+            canvas.setAttribute('type', 'tmp');
+            dom.appendChild(canvas);
+        }
+        const context = canvas?.getContext('2d');
+        context.font = textFont || '12px';
+        const len = context.measureText(name).width;
+        // 计算Y轴高度，超过的话需要出现"..."
+        const maxLen = Math.min(len, extent[1] - extent[0], maxWidth || Number.MAX_VALUE); // Y轴名称最大高度
+        const groupEl = new graphic.Group({
+            x: pos[0] + maxLen / (isY ? 2 : -2),
             y: pos[1],
-            rotation: labelLayout.rotation,
             silent: AxisBuilder.isLabelSilent(axisModel),
-            style: createTextStyle(textStyleModel, {
-                text: name,
-                font: textFont,
-                overflow: 'truncate',
-                width: maxWidth,
-                ellipsis,
-                fill: textStyleModel.getTextColor()
-                    || axisModel.get(['axisLine', 'lineStyle', 'color']) as ColorString,
-                align: textStyleModel.get('align')
-                    || labelLayout.textAlign,
-                verticalAlign: textStyleModel.get('verticalAlign')
-                    || labelLayout.textVerticalAlign
-            }),
-            z2: 1
-        }) as AxisLabelText;
+            rotation: needLabelVertical ? -PI : labelLayout.rotation
+        }) as AxisLabelGroup;
+        let x = 0;
+        if (needLabelVertical) {
+            const ellipsisWidth = context.measureText('...').width;
+            // 一个字符一个字符的翻转
+            name.split('').forEach((char) => {
+                // 计算实际宽度，因为高度就是fontsize
+                const w = context.measureText(char).width;
+                // 判断是否超长
+                if (x + ellipsisWidth + w > maxLen) {
+                    return;
+                }
+                // 单字跟字体大小一致时竖直读，不一致时横着读
+                const type = w !== fontSize ? 0 : 1;
+                groupEl.add(new graphic.Text({
+                    x,
+                    y: 0,
+                    originX: fontSize * 0.5,
+                    originY: fontSize * 0.5, //  opt.tickDirection=1表示坐标轴在右边
+                    rotation: type === 1 ? PI / 2 : 0,
+                    silent: AxisBuilder.isLabelSilent(axisModel),
+                    style: createTextStyle(textStyleModel, {
+                        text: char,
+                        font: textFont,
+                        overflow: 'truncate',
+                        ellipsis,
+                        fill: textStyleModel.getTextColor()
+                            || axisModel.get(['axisLine', 'lineStyle', 'color']) as ColorString,
+                        align: 'left' // 不加这个英文会往右靠齐
+                    }),
+                    z2: 1
+                }) as AxisLabelText);
+                x += w;
+            });
+            // 超长后需要在后面拼接"..."
+            if (len > maxLen) {
+                groupEl.add(new graphic.Text({
+                    x,
+                    y: 0,
+                    originX: fontSize / 2,
+                    originY: fontSize / -2,
+                    rotation: 0,
+                    style: createTextStyle(textStyleModel, {
+                        text: '...',
+                        font: textFont,
+                        fill: textStyleModel.getTextColor()
+                            || axisModel.get(['axisLine', 'lineStyle', 'color']) as ColorString,
+                        align: 'left' // 不加这个英文会往右靠齐
+                    }),
+                    z2: 1
+                }) as AxisLabelText);
+            }
+        }
+        else { // 使用group图形包裹原来的text以达到结构的统一
+            groupEl.add(new graphic.Text({
+                x: pos[0],
+                y: pos[1],
+                rotation: labelLayout.rotation,
+                silent: AxisBuilder.isLabelSilent(axisModel),
+                style: createTextStyle(textStyleModel, {
+                    text: name,
+                    font: textFont,
+                    overflow: 'truncate',
+                    width: maxWidth,
+                    ellipsis,
+                    fill: textStyleModel.getTextColor()
+                        || axisModel.get(['axisLine', 'lineStyle', 'color']) as ColorString,
+                    align: textStyleModel.get('align')
+                        || labelLayout.textAlign,
+                    verticalAlign: textStyleModel.get('verticalAlign')
+                        || labelLayout.textVerticalAlign
+                }),
+                z2: 1
+            }) as AxisLabelText);
+        }
+        // 自己建的dom要干掉，原则上第二次就不需要用到了
+        if (dom?.querySelector('canvas[type="tmp"]')) {
+            dom.removeChild(canvas);
+        }
 
         graphic.setTooltipConfig({
-            el: textEl,
+            el: groupEl,
             componentModel: axisModel,
             itemName: name
         });
 
-        textEl.__fullText = name;
+        groupEl.__fullText = name;
         // Id for animation
-        textEl.anid = 'name';
+        groupEl.anid = 'name';
 
         if (axisModel.get('triggerEvent')) {
             const eventData = AxisBuilder.makeAxisEventDataBase(axisModel);
             eventData.targetType = 'axisName';
             eventData.name = name;
-            getECData(textEl).eventData = eventData;
+            getECData(groupEl).eventData = eventData;
         }
 
         // FIXME
-        transformGroup.add(textEl);
-        textEl.updateTransform();
+        transformGroup.add(groupEl);
+        groupEl.updateTransform();
 
-        group.add(textEl);
+        group.add(groupEl);
 
-        textEl.decomposeTransform();
+        groupEl.decomposeTransform();
     }
 
 };
@@ -801,8 +905,8 @@ function buildAxisLabel(
                         axis.type === 'category'
                             ? rawLabel
                             : axis.type === 'value'
-                            ? tickValue + ''
-                            : tickValue,
+                                ? tickValue + ''
+                                : tickValue,
                         index
                     )
                     : textColor as string
