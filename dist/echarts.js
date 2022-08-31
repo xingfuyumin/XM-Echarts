@@ -21420,7 +21420,7 @@ function symbolPathSetColor(color2, innerColor2) {
     this.markRedraw();
   }
 }
-function createSymbol(symbolType, x, y, w, h, color2, keepAspect) {
+function createSymbol(symbolType, x, y, w, h, color2, keepAspect, dataKey) {
   const isEmpty = symbolType.indexOf("empty") === 0;
   if (isEmpty) {
     symbolType = symbolType.substr(5, 1).toLowerCase() + symbolType.substr(6);
@@ -21442,6 +21442,7 @@ function createSymbol(symbolType, x, y, w, h, color2, keepAspect) {
     });
   }
   symbolPath.__isEmptyBrush = isEmpty;
+  symbolPath.dataKey = dataKey;
   symbolPath.setColor = symbolPathSetColor;
   if (color2) {
     symbolPath.setColor(color2);
@@ -31594,7 +31595,7 @@ var Symbol = class extends Group_default {
   }
   _createSymbol(symbolType, data, idx, symbolSize, keepAspect) {
     this.removeAll();
-    const symbolPath = createSymbol(symbolType, -1, -1, 2, 2, null, keepAspect);
+    const symbolPath = createSymbol(symbolType, -1, -1, 2, 2, null, keepAspect, `${data?.hostModel?.seriesIndex} | ${idx}`);
     symbolPath.attr({
       z2: 100,
       culling: true,
@@ -34270,6 +34271,7 @@ var elementCreator = {
       z2: 1
     });
     rect.__dataIndex = newIndex;
+    rect.dataKey = `${seriesModel?.seriesIndex} | ${newIndex}`;
     rect.name = "item";
     if (animationModel) {
       const rectShape = rect.shape;
@@ -37305,7 +37307,8 @@ function collectAxesInfo(result, ecModel, api2) {
     const baseTooltipModel = coordSysModel.getModel("tooltip", globalTooltipModel);
     each(coordSys.getAxes(), curry(saveTooltipAxisInfo, false, null));
     if (coordSys.getTooltipAxes && globalTooltipModel && baseTooltipModel.get("show")) {
-      const triggerAxis = baseTooltipModel.get("trigger") === "axis";
+      const triggerAxis = baseTooltipModel.get("trigger") === "axis" || baseTooltipModel.get("trigger") === "auto";
+      ;
       const cross = baseTooltipModel.get(["axisPointer", "type"]) === "cross";
       const tooltipAxes = coordSys.getTooltipAxes(baseTooltipModel.get(["axisPointer", "axis"]));
       if (triggerAxis || cross) {
@@ -37490,7 +37493,7 @@ var AxisView2 = class extends Component_default2 {
       return;
     }
     const axisPointerModel = getAxisPointerModel(axisModel);
-    axisPointerModel ? (this._axisPointer || (this._axisPointer = new Clazz())).render(axisModel, axisPointerModel, api2, forceRender) : this._disposeAxisPointer(api2);
+    axisPointerModel && !axisModel?.ecModel?.getUpdatePayload()?.dataKey ? (this._axisPointer || (this._axisPointer = new Clazz())).render(axisModel, axisPointerModel, api2, forceRender) : this._disposeAxisPointer(api2);
   }
   _disposeAxisPointer(api2) {
     this._axisPointer && this._axisPointer.dispose(api2);
@@ -50374,6 +50377,7 @@ function createNormalBox(itemLayout, data, dataIndex, constDim, isInit) {
       points: isInit ? transInit(ends, constDim, itemLayout) : ends
     }
   });
+  el.dataKey = `${data?.hostModel?.seriesIndex} | ${dataIndex}`;
   updateNormalBoxData(itemLayout, el, data, dataIndex, isInit);
   return el;
 }
@@ -56539,13 +56543,15 @@ var AxisPointerView2 = class extends Component_default2 {
   render(globalAxisPointerModel, ecModel, api2) {
     const globalTooltipModel = ecModel.getComponent("tooltip");
     const triggerOn = globalAxisPointerModel.get("triggerOn") || (globalTooltipModel && globalTooltipModel.get("triggerOn") || "mousemove|click");
+    const tooltipTrigger = globalTooltipModel && globalTooltipModel.get("trigger");
     register("axisPointer", api2, function(currTrigger, e2, dispatchAction3) {
       if (triggerOn !== "none" && (currTrigger === "leave" || triggerOn.indexOf(currTrigger) >= 0)) {
         dispatchAction3({
           type: "updateAxisPointer",
           currTrigger,
           x: e2 && e2.offsetX,
-          y: e2 && e2.offsetY
+          y: e2 && e2.offsetY,
+          dataKey: tooltipTrigger === "auto" && (e2?.topTarget?.dataKey || e2?.target?.dataKey)
         });
       }
     });
@@ -56672,7 +56678,7 @@ function axisTrigger(payload, ecModel, api2) {
   });
   updateModelActually(showValueMap, axesInfo, outputPayload);
   dispatchTooltipActually(dataByCoordSys, point, payload, dispatchAction3);
-  dispatchHighDownActually(axesInfo, dispatchAction3, api2);
+  dispatchHighDownActually(axesInfo, dispatchAction3, api2, payload?.dataKey);
   return outputPayload;
 }
 function processOnAxis(axisInfo, newValue, updaters, noSnap, outputFinder) {
@@ -56824,7 +56830,7 @@ function dispatchTooltipActually(dataByCoordSys, point, payload, dispatchAction3
     dataByCoordSys: dataByCoordSys.list
   });
 }
-function dispatchHighDownActually(axesInfo, dispatchAction3, api2) {
+function dispatchHighDownActually(axesInfo, dispatchAction3, api2, dataKey) {
   const zr = api2.getZr();
   const highDownKey = "axisPointerLastHighlights";
   const lastHighlights = inner13(zr)[highDownKey] || {};
@@ -56833,7 +56839,9 @@ function dispatchHighDownActually(axesInfo, dispatchAction3, api2) {
     const option = axisInfo.axisPointerModel.option;
     option.status === "show" && each(option.seriesDataIndices, function(batchItem) {
       const key2 = batchItem.seriesIndex + " | " + batchItem.dataIndex;
-      newHighlights[key2] = batchItem;
+      if (!dataKey || key2 === dataKey) {
+        newHighlights[key2] = batchItem;
+      }
     });
   });
   const toHighlight = [];
@@ -62329,8 +62337,21 @@ var TooltipView2 = class extends Component_default2 {
       seriesModel && (seriesModel.coordinateSystem || {}).model
     ], this._tooltipModel, positionDefault ? {position: positionDefault} : null);
     const tooltipTrigger = tooltipModel.get("trigger");
-    if (tooltipTrigger != null && tooltipTrigger !== "item") {
+    if (tooltipTrigger !== "auto" && tooltipTrigger !== "item") {
       return;
+    }
+    if (tooltipTrigger === "auto") {
+      dispatchAction3({
+        type: "updateAxisPointer",
+        currTrigger: "leave",
+        x: e2 && e2.offsetX,
+        y: e2 && e2.offsetY
+      });
+      dispatchAction3({
+        type: "highlight",
+        dataIndex,
+        seriesIndex
+      });
     }
     const params = dataModel.getDataParams(dataIndex, dataType);
     const markupStyleCreator = new TooltipMarkupStyleCreator();

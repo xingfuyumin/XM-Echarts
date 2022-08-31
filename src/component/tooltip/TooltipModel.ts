@@ -49,7 +49,7 @@ export interface TooltipOption extends CommonTooltipOption<TopLevelFormatterPara
     /**
      * Trigger only works on coordinate system.
      */
-    trigger?: 'item' | 'axis' | 'none'
+    trigger?: 'item' | 'axis' | 'auto' | 'none'
 
     displayMode?: 'single' | 'multipleByCoordSys';
 

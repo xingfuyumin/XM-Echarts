@@ -147,7 +147,6 @@ function createNormalBox(
     isInit?: boolean
 ) {
     const ends = itemLayout.ends;
-
     const el = new BoxPath({
         shape: {
             points: isInit
@@ -155,6 +154,7 @@ function createNormalBox(
                 : ends
         }
     });
+    (el as any).dataKey = `${(data?.hostModel as any)?.seriesIndex} | ${dataIndex}`;
 
     updateNormalBoxData(itemLayout, el, data, dataIndex, isInit);
 

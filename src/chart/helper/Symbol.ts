@@ -76,7 +76,7 @@ class Symbol extends graphic.Group {
         // and macOS Sierra, a circle stroke become a rect, no matter what
         // the scale is set. So we set width/height as 2. See #4150.
         const symbolPath = createSymbol(
-            symbolType, -1, -1, 2, 2, null, keepAspect
+            symbolType, -1, -1, 2, 2, null, keepAspect, `${(data?.hostModel as any)?.seriesIndex} | ${idx}`
         );
 
         symbolPath.attr({

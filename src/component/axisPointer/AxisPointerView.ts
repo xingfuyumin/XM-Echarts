@@ -35,6 +35,7 @@ class AxisPointerView extends ComponentView {
 
         // Register global listener in AxisPointerView to enable
         // AxisPointerView to be independent to Tooltip.
+        const tooltipTrigger = globalTooltipModel && globalTooltipModel.get('trigger');
         globalListener.register(
             'axisPointer',
             api,
@@ -47,7 +48,10 @@ class AxisPointerView extends ComponentView {
                         type: 'updateAxisPointer',
                         currTrigger: currTrigger,
                         x: e && e.offsetX,
-                        y: e && e.offsetY
+                        y: e && e.offsetY,
+                        // dataKey存放图形对应的seriesIndex和dataIndex信息，是判断又没有放到图形上的依据
+                        dataKey: tooltipTrigger === 'auto'
+                            && ((e?.topTarget as any)?.dataKey || (e?.target as any)?.dataKey)
                     });
                 }
             }

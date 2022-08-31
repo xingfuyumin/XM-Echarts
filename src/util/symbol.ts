@@ -31,6 +31,7 @@ export type ECSymbol = graphic.Path & {
     __isEmptyBrush?: boolean
     setColor: (color: ZRColor, innerColor?: ZRColor) => void
     getColor: () => ZRColor
+    dataKey: string; // 图形绑定坐标信息，后面axispointer判断是否是单点触发的依据
 };
 type SymbolCtor = { new(): ECSymbol };
 type SymbolShapeMaker = (x: number, y: number, w: number, h: number, shape: Dictionary<any>) => void;
@@ -337,7 +338,8 @@ export function createSymbol(
     h: number,
     color?: ZRColor,
     // whether to keep the ratio of w/h,
-    keepAspect?: boolean
+    keepAspect?: boolean,
+    dataKey?: string
 ) {
     // TODO Support image object, DynamicImage.
 
@@ -375,6 +377,7 @@ export function createSymbol(
     }
 
     (symbolPath as ECSymbol).__isEmptyBrush = isEmpty;
+    (symbolPath as ECSymbol).dataKey = dataKey;
 
     // TODO Should deprecate setColor
     (symbolPath as ECSymbol).setColor = symbolPathSetColor;

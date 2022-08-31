@@ -170,7 +170,6 @@ class TooltipView extends ComponentView {
 
         const tooltipModel = ecModel.getComponent('tooltip') as TooltipModel;
         const renderMode = this._renderMode = getTooltipRenderMode(tooltipModel.get('renderMode'));
-
         this._tooltipContent = renderMode === 'richText'
             ? new TooltipRichContent(api)
             : new TooltipHTMLContent(api.getDom(), api, {
@@ -232,7 +231,6 @@ class TooltipView extends ComponentView {
             'itemTooltip',
             this._api,
             bind(function (currTrigger, e, dispatchAction) {
-                // If 'none', it is not controlled by mouse totally.
                 if (triggerOn !== 'none') {
                     if (triggerOn.indexOf(currTrigger) >= 0) {
                         this._tryShow(e, dispatchAction);
@@ -465,7 +463,6 @@ class TooltipView extends ComponentView {
         // Save mouse x, mouse y. So we can try to keep showing the tip if chart is refreshed
         this._lastX = e.offsetX;
         this._lastY = e.offsetY;
-
         const dataByCoordSys = e.dataByCoordSys;
         if (dataByCoordSys && dataByCoordSys.length) {
             this._showAxisTooltip(dataByCoordSys, e);
@@ -673,8 +670,21 @@ class TooltipView extends ComponentView {
         );
 
         const tooltipTrigger = tooltipModel.get('trigger');
-        if (tooltipTrigger != null && tooltipTrigger !== 'item') {
+        if (tooltipTrigger !== 'auto' && tooltipTrigger !== 'item') {
             return;
+        }
+        if (tooltipTrigger === 'auto') {
+            dispatchAction({
+                type: 'updateAxisPointer',
+                currTrigger: 'leave',
+                x: e && e.offsetX,
+                y: e && e.offsetY
+            });
+            dispatchAction({
+                type: 'highlight',
+                dataIndex,
+                seriesIndex,
+            });
         }
 
         const params = dataModel.getDataParams(dataIndex, dataType);

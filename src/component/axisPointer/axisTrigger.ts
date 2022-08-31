@@ -17,7 +17,7 @@
 * under the License.
 */
 
-import {makeInner, ModelFinderObject} from '../../util/model';
+import { makeInner, ModelFinderObject } from '../../util/model';
 import * as modelHelper from './modelHelper';
 import findPointFromSeries from './findPointFromSeries';
 import GlobalModel from '../../model/Global';
@@ -203,7 +203,7 @@ export default function axisTrigger(
 
     updateModelActually(showValueMap, axesInfo, outputPayload);
     dispatchTooltipActually(dataByCoordSys, point, payload, dispatchAction);
-    dispatchHighDownActually(axesInfo, dispatchAction, api);
+    dispatchHighDownActually(axesInfo, dispatchAction, api, payload?.dataKey);
 
     return outputPayload;
 }
@@ -420,7 +420,7 @@ function dispatchTooltipActually(
 ) {
     // Basic logic: If no showTip required, hideTip will be dispatched.
     if (illegalPoint(point) || !dataByCoordSys.list.length) {
-        dispatchAction({type: 'hideTip'});
+        dispatchAction({ type: 'hideTip' });
         return;
     }
 
@@ -447,7 +447,8 @@ function dispatchTooltipActually(
 function dispatchHighDownActually(
     axesInfo: Dictionary<CollectedAxisInfo>,
     dispatchAction: ExtensionAPI['dispatchAction'],
-    api: ExtensionAPI
+    api: ExtensionAPI,
+    dataKey?: string
 ) {
     // FIXME
     // highlight status modification shoule be a stage of main process?
@@ -464,7 +465,9 @@ function dispatchHighDownActually(
         const option = axisInfo.axisPointerModel.option;
         option.status === 'show' && each(option.seriesDataIndices, function (batchItem) {
             const key = batchItem.seriesIndex + ' | ' + batchItem.dataIndex;
-            newHighlights[key] = batchItem;
+            if (!dataKey || key === dataKey) { // 放在点上时点继续高亮，其他的点要取消高亮
+                newHighlights[key] = batchItem;
+            }
         });
     });
 

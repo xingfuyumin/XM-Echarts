@@ -770,7 +770,7 @@ const elementCreator: {
             z2: 1
         });
         (rect as any).__dataIndex = newIndex;
-
+        (rect as any).dataKey = `${seriesModel?.seriesIndex} | ${newIndex}`;
         rect.name = 'item';
 
         if (animationModel) {

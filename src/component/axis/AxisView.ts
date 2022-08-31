@@ -98,7 +98,7 @@ class AxisView extends ComponentView {
             return;
         }
         const axisPointerModel = axisPointerModelHelper.getAxisPointerModel(axisModel);
-        axisPointerModel
+        axisPointerModel && !axisModel?.ecModel?.getUpdatePayload()?.dataKey // 隐藏坐标指示线
             ? (this._axisPointer || (this._axisPointer = new Clazz()))
                 .render(axisModel, axisPointerModel, api, forceRender)
             : this._disposeAxisPointer(api);

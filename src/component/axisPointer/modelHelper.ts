@@ -149,7 +149,8 @@ function collectAxesInfo(result: CollectionResult, ecModel: GlobalModel, api: Ex
         ) {
             // Compatible with previous logic. But series.tooltip.trigger: 'axis'
             // or series.data[n].tooltip.trigger: 'axis' are not support any more.
-            const triggerAxis = baseTooltipModel.get('trigger') === 'axis';
+            const triggerAxis = baseTooltipModel.get('trigger') === 'axis'
+            || baseTooltipModel.get('trigger') === 'auto';;
             const cross = baseTooltipModel.get(['axisPointer', 'type']) === 'cross';
             const tooltipAxes = coordSys.getTooltipAxes(baseTooltipModel.get(['axisPointer', 'axis']));
             if (triggerAxis || cross) {
