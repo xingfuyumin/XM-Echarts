@@ -42,6 +42,9 @@ class TooltipRichContent {
     private _inContent: boolean;
 
     private _hideDelay: number;
+    private _triggerDataIndex: number = -1; // 触发tooltip的x轴位置，用来比较是否同一个数据触发
+    private _triggerSeriesIndex: number = -1; // 触发tooltip的系列位置，用来比较是否同一个数据触发
+    private _triggerDataValue: any = null; // 触发tooltip的x轴位置的值，用来计算实时位置
 
     el: ZRText;
 
@@ -209,6 +212,17 @@ class TooltipRichContent {
 
     dispose() {
         this._zr.remove(this.el);
+    }
+    isInContent() { // 焦点是否在tooltip里
+        return this._inContent;
+    }
+    setTriggerIndex(triggerDataIndex: number, triggerSeriesIndex: number, triggerDataValue: any) {
+        this._triggerDataIndex = triggerDataIndex;
+        this._triggerSeriesIndex = triggerSeriesIndex;
+        this._triggerDataValue = triggerDataValue;
+    }
+    getTriggerIndex() {
+        return [this._triggerDataIndex, this._triggerSeriesIndex, this._triggerDataValue];
     }
 }
 

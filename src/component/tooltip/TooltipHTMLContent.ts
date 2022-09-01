@@ -51,10 +51,10 @@ function mirrorPos(pos: string): string {
     pos = pos === 'left'
         ? 'right'
         : pos === 'right'
-        ? 'left'
-        : pos === 'top'
-        ? 'bottom'
-        : 'top';
+            ? 'left'
+            : pos === 'top'
+                ? 'bottom'
+                : 'top';
     return pos;
 }
 
@@ -271,6 +271,9 @@ class TooltipHTMLContent {
     private _inContent: boolean;
     private _firstShow = true;
     private _longHide = true;
+    private _triggerDataIndex: number = -1; // 触发tooltip的x轴位置，用来比较是否同一个数据触发
+    private _triggerSeriesIndex: number = -1; // 触发tooltip的系列位置，用来比较是否同一个数据触发
+    private _triggerDataValue: any = null; // 触发tooltip的x轴位置的值，用来计算实时位置
     /**
      * Record long-time hide
      */
@@ -458,7 +461,7 @@ class TooltipHTMLContent {
             const style = this.el.style;
             const transforms = assembleTransform(styleCoord[0], styleCoord[1]) as string[][];
             each(transforms, (transform) => {
-              style[transform[0] as any] = transform[1];
+                style[transform[0] as any] = transform[1];
             });
         }
     }
@@ -507,6 +510,17 @@ class TooltipHTMLContent {
 
     dispose() {
         this.el.parentNode.removeChild(this.el);
+    }
+    isInContent() { // 焦点是否在tooltip里
+        return this._inContent;
+    }
+    setTriggerIndex(triggerDataIndex: number, triggerSeriesIndex: number, triggerDataValue: any) {
+        this._triggerDataIndex = triggerDataIndex;
+        this._triggerSeriesIndex = triggerSeriesIndex;
+        this._triggerDataValue = triggerDataValue;
+    }
+    getTriggerIndex() {
+        return [this._triggerDataIndex, this._triggerSeriesIndex, this._triggerDataValue];
     }
 
 }

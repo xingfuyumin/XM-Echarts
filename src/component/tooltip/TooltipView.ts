@@ -57,6 +57,7 @@ import { normalizeTooltipFormatResult } from '../../model/mixin/dataFormat';
 import { createTooltipMarkup, buildTooltipMarkup, TooltipMarkupStyleCreator } from './tooltipMarkup';
 import { findEventDispatcher } from '../../util/event';
 import { clear, createOrUpdate } from '../../util/throttle';
+import { ECharts } from '../../echarts.all';
 
 const proxyRect = new Rect({
     shape: { x: -1, y: -1, width: 2, height: 2 }
@@ -163,6 +164,18 @@ class TooltipView extends ComponentView {
     private _lastDataByCoordSys: DataByCoordSys[];
     private _cbParamsList: TooltipCallbackDataParams[];
 
+    /**
+     * 根据数据计算像素位置
+     * @param chart
+     * @param seriesIndex
+     * @param dataIndex
+     * @param x
+     * @returns
+     */
+    private _convertToPixel(chart: ECharts, seriesIndex: number, dataIndex: number, x: any) {
+        return chart?.convertToPixel({ seriesIndex, dataIndex }, [x, 0]);
+    }
+
     init(ecModel: GlobalModel, api: ExtensionAPI) {
         if (env.node || !api.getDom()) {
             return;
@@ -175,6 +188,9 @@ class TooltipView extends ComponentView {
             : new TooltipHTMLContent(api.getDom(), api, {
                 appendToBody: tooltipModel.get('appendToBody', true)
             });
+        api.on('globalout', () => {
+            clearTimeout(this._showTimout);
+        });
     }
 
     render(
@@ -465,7 +481,7 @@ class TooltipView extends ComponentView {
         this._lastY = e.offsetY;
         const dataByCoordSys = e.dataByCoordSys;
         if (dataByCoordSys && dataByCoordSys.length) {
-            this._showAxisTooltip(dataByCoordSys, e);
+            this._showAxisTooltip(dataByCoordSys, e, dispatchAction);
         }
         else if (el) {
             this._lastDataByCoordSys = null;
@@ -519,7 +535,8 @@ class TooltipView extends ComponentView {
 
     private _showAxisTooltip(
         dataByCoordSys: DataByCoordSys[],
-        e: TryShowParams
+        e: TryShowParams,
+        dispatchAction: ExtensionAPI['dispatchAction']
     ) {
         const ecModel = this._ecModel;
         const globalTooltipModel = this._tooltipModel;
@@ -629,7 +646,7 @@ class TooltipView extends ComponentView {
             else {
                 this._showTooltipContent(
                     singleTooltipModel, allMarkupText, cbParamsList, Math.random() + '',
-                    point[0], point[1], positionExpr, null, markupStyleCreator
+                    point[0], point[1], positionExpr, null, markupStyleCreator, dispatchAction
                 );
             }
         });
@@ -683,7 +700,7 @@ class TooltipView extends ComponentView {
             dispatchAction({
                 type: 'highlight',
                 dataIndex,
-                seriesIndex,
+                seriesIndex
             });
         }
 
@@ -702,13 +719,13 @@ class TooltipView extends ComponentView {
         const valueFormatter = tooltipModel.get('valueFormatter');
         const frag = seriesTooltipResult.frag;
         const markupText = frag ? buildTooltipMarkup(
-                valueFormatter ? extend({ valueFormatter }, frag) : frag,
-                markupStyleCreator,
-                renderMode,
-                orderMode,
-                ecModel.get('useUTC'),
-                tooltipModel.get('textStyle')
-            )
+            valueFormatter ? extend({ valueFormatter }, frag) : frag,
+            markupStyleCreator,
+            renderMode,
+            orderMode,
+            ecModel.get('useUTC'),
+            tooltipModel.get('textStyle')
+        )
             : seriesTooltipResult.text;
 
         const asyncTicket = 'item_' + dataModel.name + '_' + dataIndex;
@@ -717,7 +734,7 @@ class TooltipView extends ComponentView {
             this._showTooltipContent(
                 tooltipModel, markupText, params, asyncTicket,
                 e.offsetX, e.offsetY, e.position, e.target,
-                markupStyleCreator
+                markupStyleCreator, dispatchAction
             );
         });
 
@@ -781,7 +798,7 @@ class TooltipView extends ComponentView {
             const formatterParams = clone(subTooltipModel.get('formatterParams') as any || {});
             this._showTooltipContent(
                 subTooltipModel, defaultHtml, formatterParams,
-                asyncTicket, e.offsetX, e.offsetY, e.position, el, markupStyleCreator
+                asyncTicket, e.offsetX, e.offsetY, e.position, el, markupStyleCreator, dispatchAction
             );
         });
 
@@ -803,8 +820,65 @@ class TooltipView extends ComponentView {
         y: number,
         positionExpr: TooltipOption['position'],
         el: ECElement,
-        markupStyleCreator: TooltipMarkupStyleCreator
+        markupStyleCreator: TooltipMarkupStyleCreator,
+        dispatchAction: ExtensionAPI['dispatchAction']
     ) {
+        const chart = tooltipModel?.ecModel?.scheduler?.ecInstance;
+        const inContent = this._tooltipContent.isInContent();
+        let currentTriggerDataIndex = -1;
+        let currentTriggerSeriesIndex = -1;
+        let xValue = null;
+        if (!Array.isArray(params)) {
+            currentTriggerDataIndex = params.dataIndex;
+            currentTriggerSeriesIndex = params.seriesIndex;
+            xValue = params.axisValue;
+        }
+        else {
+            currentTriggerDataIndex = params[0]?.dataIndex;
+            xValue = params[0]?.axisValue;
+        }
+        const [triggerDataIndex, triggerSeriesIndex, triggerDataValue] = this._tooltipContent.getTriggerIndex();
+        if (inContent) {
+            if ((currentTriggerDataIndex !== triggerDataIndex
+                || currentTriggerSeriesIndex !== triggerSeriesIndex)
+                && (currentTriggerDataIndex !== -1 || currentTriggerSeriesIndex !== -1)) {
+                // 鼠标移到tooltip内容上时如果经过其他的点就重置高亮效果到当初出发的那个点
+                if (currentTriggerSeriesIndex === -1) { // 说明不是单点触发
+                    dispatchAction({
+                        type: 'updateAxisPointer',
+                        currTrigger: 'leave',
+                        x,
+                        y
+                    });
+                }
+                if (triggerSeriesIndex === -1) { // 说明不是单点触发
+                    // 缩放轴会导致原x坐标失效，需要实时计算
+                    const [triggerX] = this._convertToPixel(
+                        chart, triggerSeriesIndex === -1 ? 0 : triggerSeriesIndex,
+                        triggerDataIndex, triggerDataValue) as any;
+                    dispatchAction({
+                        type: 'updateAxisPointer',
+                        currTrigger: 'mousemove',
+                        x: triggerX,
+                        y: y
+                    });
+                }
+                dispatchAction({
+                    type: 'downplay',
+                    dataIndex: currentTriggerDataIndex === -1 ? undefined : currentTriggerDataIndex,
+                    seriesIndex: currentTriggerSeriesIndex === -1 ? undefined : currentTriggerSeriesIndex
+                });
+                dispatchAction({
+                    type: 'highlight',
+                    escapeConnect: true,
+                    notBlur: triggerSeriesIndex === -1,
+                    dataIndex: triggerDataIndex === -1 ? undefined : triggerDataIndex,
+                    seriesIndex: triggerSeriesIndex === -1 ? undefined : triggerSeriesIndex
+                });
+            }
+            return;
+        }
+        this._tooltipContent.setTriggerIndex(currentTriggerDataIndex, currentTriggerSeriesIndex, xValue);
         // Reset ticket
         this._ticket = '';
 
@@ -825,7 +899,6 @@ class TooltipView extends ComponentView {
             tooltipModel.get('borderColor')
         );
         const nearPointColor = nearPoint.color;
-
         if (formatter) {
             if (isString(formatter)) {
                 const useUTC = tooltipModel.ecModel.get('useUTC');
