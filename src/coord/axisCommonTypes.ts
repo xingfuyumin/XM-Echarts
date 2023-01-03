@@ -36,6 +36,7 @@ export interface AxisBaseOptionCommon extends ComponentOption,
     // Axis name displayed.
     name?: string;
     nameLocation?: 'start' | 'middle' | 'end';
+    nameVertical?: boolean;
     // By degree.
     nameRotate?: number;
     nameTruncate?: {

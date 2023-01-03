@@ -381,6 +381,7 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
         }
 
         const nameLocation = axisModel.get('nameLocation');
+        const nameVertical = axisModel.get('nameVertical');
         const nameDirection = opt.nameDirection;
         const textStyleModel = axisModel.getModel('nameTextStyle');
         const gap = axisModel.get('nameGap') || 0;
@@ -393,7 +394,7 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
         // 判断标签是在左侧还是在右侧
         const labelHorizontalPosition = !(opt.tickDirection === 1);
         // 判断是否需要文本竖直排列，只有文本居中排列的Y轴才需要
-        const needLabelVertical = isNameLocationCenter(nameLocation) && isY;
+        const needLabelVertical = nameVertical && isY;
         // 需要获取文字的大小以计算偏移位置
         const fontSize: number = (textStyleModel.get('fontSize') as number) || 12;
         const extent = axisModel.axis.getExtent();
@@ -405,8 +406,9 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
                     ? extent[1] + gapSignal * gap
                     : (extent[0] + extent[1]) / 2, // 'middle'
             // 计算标签起始位置，默认Y轴刻度往左右各偏移一个字符的距离
-            needLabelVertical ? nameDirection * gap
-                + (labelHorizontalPosition ? -boundingRect.width : boundingRect.width + fontSize)
+            // opt.labelOffset是0刻度到左侧的距离（不包含刻度值）
+            needLabelVertical ? opt.labelOffset + nameDirection * gap
+                + (labelHorizontalPosition ? -boundingRect.width : (boundingRect.width + fontSize))
                 : isNameLocationCenter(nameLocation) ? opt.labelOffset + nameDirection * gap : 0
         ];
 
@@ -466,12 +468,19 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
         const len = context.measureText(name).width;
         // 计算Y轴高度，超过的话需要出现"..."
         const maxLen = Math.min(len, extent[1] - extent[0], maxWidth || Number.MAX_VALUE); // Y轴名称最大高度
+        // 检查是否有方字体
+        const hasChinese = name.split('').find((char) => {
+            const w = context.measureText(char).width;
+            return w === fontSize;
+        });
         const groupEl = new graphic.Group({
-            x: pos[0] + maxLen / (isY ? 2 : -2),
-            y: pos[1],
+            x: pos[0],
+            y: !hasChinese && needLabelVertical ? pos[1] - fontSize : pos[1],
             silent: AxisBuilder.isLabelSilent(axisModel),
-            rotation: needLabelVertical ? -PI : labelLayout.rotation
+            rotation: needLabelVertical ? hasChinese ? -PI : -PI * 2 : labelLayout.rotation
         }) as AxisLabelGroup;
+        const baseX = (isY && nameLocation === 'start') || (!isY && nameLocation === 'end')
+            ? -maxLen : isNameLocationCenter(nameLocation) ? maxLen / -2 : 0;
         let x = 0;
         if (needLabelVertical) {
             const ellipsisWidth = context.measureText('...').width;
@@ -486,7 +495,7 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
                 // 单字跟字体大小一致时竖直读，不一致时横着读
                 const type = w !== fontSize ? 0 : 1;
                 groupEl.add(new graphic.Text({
-                    x,
+                    x: baseX + x,
                     y: 0,
                     originX: fontSize * 0.5,
                     originY: fontSize * 0.5, //  opt.tickDirection=1表示坐标轴在右边
@@ -508,7 +517,7 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
             // 超长后需要在后面拼接"..."
             if (len > maxLen) {
                 groupEl.add(new graphic.Text({
-                    x,
+                    x: baseX + x,
                     y: 0,
                     originX: fontSize / 2,
                     originY: fontSize / -2,
@@ -526,15 +535,12 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
         }
         else { // 使用group图形包裹原来的text以达到结构的统一
             groupEl.add(new graphic.Text({
-                x: pos[0],
-                y: pos[1],
-                rotation: labelLayout.rotation,
                 silent: AxisBuilder.isLabelSilent(axisModel),
                 style: createTextStyle(textStyleModel, {
                     text: name,
                     font: textFont,
                     overflow: 'truncate',
-                    width: maxWidth,
+                    width: Math.min(maxWidth || Number.MAX_VALUE, extent[1] - extent[0]),
                     ellipsis,
                     fill: textStyleModel.getTextColor()
                         || axisModel.get(['axisLine', 'lineStyle', 'color']) as ColorString,

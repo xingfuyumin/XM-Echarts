@@ -32,6 +32,7 @@ const defaultOption: AxisBaseOption = {
     name: '',
     // 'start' | 'middle' | 'end'
     nameLocation: 'end',
+    nameVertical: false,
     // By degree. By default auto rotate by nameLocation.
     nameRotate: null,
     nameTruncate: {

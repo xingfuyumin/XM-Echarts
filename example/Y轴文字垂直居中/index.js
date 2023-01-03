@@ -16,6 +16,7 @@ const option = {
     type: 'value',
     name: '感谢二蛋给Thank Erdan for findشكرا لك على سبة لي .ing me something to do我找العمل بالن事做',
     nameLocation: 'center',
+    nameVertical: true,
   },
   series: [
     {
@@ -30,17 +31,21 @@ const option2 = {
   },
   xAxis: {
     type: 'category',
-    data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    name: 'Erdan for findشكرا لك على سبة لي .ing me something to',
+    nameLocation: 'center'
   },
   yAxis: [{
     type: 'value',
-    name: '感谢二蛋给Thank Erdan for findشكرا لك على سبة لي .ing me something to do我找العمل بالن事做',
-    nameLocation: 'center'
+    name: 'Thank Erdan for findشكرا لك على سبة لي .ing me something to d',
+    nameLocation: 'center',
+    nameVertical: true,
   }, {
     type: 'value',
     name: '感谢二蛋给Thank Erdan for findشكرا لك على سبة لي .ing me something to do我找العمل بالن事做',
+    nameVertical: true,
     nameLocation: 'center'
-  }],
+  }, ],
   series: [
     {
       data: [150, 230, 224, 218, 135, 147, 260],
@@ -64,6 +69,7 @@ const option3 =
     type: 'value',
     name: '感谢二蛋给Thank Erdan for findشكرا لك على سبة لي .ing me something to do我找العمل بالن事做',
     nameLocation: 'center',
+    nameVertical: true,
     nameGap: 0,
     position: 'right',
   }],
