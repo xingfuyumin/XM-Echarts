@@ -42671,6 +42671,7 @@
       name: '',
       // 'start' | 'middle' | 'end'
       nameLocation: 'end',
+      nameVertical: false,
       // By degree. By default auto rotate by nameLocation.
       nameRotate: null,
       nameTruncate: {
@@ -44111,9 +44112,12 @@
         }
 
         var nameLocation = axisModel.get('nameLocation');
+        var nameVertical = axisModel.get('nameVertical');
         var nameDirection = opt.nameDirection;
         var textStyleModel = axisModel.getModel('nameTextStyle');
-        var gap = axisModel.get('nameGap') || 0; // 需要提前计算好这些信息后面用做判断
+        var gap = axisModel.get('nameGap') || 0;
+        var axisLine = axisModel.get('axisLine'); // axisLine.show=true时boundingRect.width包含opt.labelOffset
+        // 需要提前计算好这些信息后面用做判断
         // Y轴标签容器，用来计算标签左右侧起始位置
 
         var boundingRect = group.getBoundingRect(); // 判断是否Y轴，X轴不需要启用文本竖直排列
@@ -44122,13 +44126,14 @@
 
         var labelHorizontalPosition = !(opt.tickDirection === 1); // 判断是否需要文本竖直排列，只有文本居中排列的Y轴才需要
 
-        var needLabelVertical = isNameLocationCenter(nameLocation) && isY; // 需要获取文字的大小以计算偏移位置
+        var needLabelVertical = nameVertical && isY; // 需要获取文字的大小以计算偏移位置
 
         var fontSize = textStyleModel.get('fontSize') || 12;
         var extent = axisModel.axis.getExtent();
         var gapSignal = extent[0] > extent[1] ? -1 : 1;
         var pos = [nameLocation === 'start' ? extent[0] - gapSignal * gap : nameLocation === 'end' ? extent[1] + gapSignal * gap : (extent[0] + extent[1]) / 2, // 计算标签起始位置，默认Y轴刻度往左右各偏移一个字符的距离
-        needLabelVertical ? nameDirection * gap + (labelHorizontalPosition ? -boundingRect.width : boundingRect.width + fontSize) : isNameLocationCenter(nameLocation) ? opt.labelOffset + nameDirection * gap : 0];
+        // opt.labelOffset是0刻度到左侧的距离（不包含刻度值）
+        needLabelVertical ? ((axisLine === null || axisLine === void 0 ? void 0 : axisLine.show) ? 0 : opt.labelOffset + nameDirection * gap - nameDirection * fontSize / 2) + (labelHorizontalPosition ? -boundingRect.width : boundingRect.width + fontSize) : isNameLocationCenter(nameLocation) ? opt.labelOffset + nameDirection * gap : 0];
         var labelLayout;
         var nameRotation = axisModel.get('nameRotate');
 
@@ -44177,13 +44182,19 @@
         var len = context.measureText(name).width; // 计算Y轴高度，超过的话需要出现"..."
 
         var maxLen = Math.min(len, extent[1] - extent[0], maxWidth || Number.MAX_VALUE); // Y轴名称最大高度
+        // 检查是否有方字体
 
-        var groupEl = new Group({
-          x: pos[0] + maxLen / (isY ? 2 : -2),
-          y: pos[1],
-          silent: AxisBuilder.isLabelSilent(axisModel),
-          rotation: needLabelVertical ? -PI$4 : labelLayout.rotation
+        var hasChinese = !!name.split('').find(function (char) {
+          var w = context.measureText(char).width;
+          return w === fontSize;
         });
+        var groupEl = new Group({
+          x: pos[0],
+          y: !hasChinese && needLabelVertical ? pos[1] - fontSize : pos[1],
+          silent: AxisBuilder.isLabelSilent(axisModel),
+          rotation: needLabelVertical ? hasChinese ? -PI$4 : -PI$4 * 2 : labelLayout.rotation
+        });
+        var baseX = isY && nameLocation === 'start' || !isY && nameLocation === 'end' ? -maxLen : isNameLocationCenter(nameLocation) ? maxLen / -2 : 0;
         var x = 0;
 
         if (needLabelVertical) {
@@ -44200,7 +44211,7 @@
 
             var type = w !== fontSize ? 0 : 1;
             groupEl.add(new ZRText({
-              x: x,
+              x: baseX + x,
               y: 0,
               originX: fontSize * 0.5,
               originY: fontSize * 0.5,
@@ -44222,7 +44233,7 @@
 
           if (len > maxLen) {
             groupEl.add(new ZRText({
-              x: x,
+              x: baseX + x,
               y: 0,
               originX: fontSize / 2,
               originY: fontSize / -2,
@@ -44240,15 +44251,12 @@
         } else {
           // 使用group图形包裹原来的text以达到结构的统一
           groupEl.add(new ZRText({
-            x: pos[0],
-            y: pos[1],
-            rotation: labelLayout.rotation,
             silent: AxisBuilder.isLabelSilent(axisModel),
             style: createTextStyle(textStyleModel, {
               text: name,
               font: textFont,
               overflow: 'truncate',
-              width: maxWidth,
+              width: Math.min(maxWidth || Number.MAX_VALUE, extent[1] - extent[0]),
               ellipsis: ellipsis,
               fill: textStyleModel.getTextColor() || axisModel.get(['axisLine', 'lineStyle', 'color']),
               align: textStyleModel.get('align') || labelLayout.textAlign,
