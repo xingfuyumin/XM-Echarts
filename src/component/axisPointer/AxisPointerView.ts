@@ -44,6 +44,7 @@ class AxisPointerView extends ComponentView {
                 if (triggerOn !== 'none'
                     && (currTrigger === 'leave' || triggerOn.indexOf(currTrigger) >= 0)
                 ) {
+                    console.log(111);
                     dispatchAction({
                         type: 'updateAxisPointer',
                         currTrigger: currTrigger,

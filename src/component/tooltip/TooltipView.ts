@@ -655,6 +655,9 @@ class TooltipView extends ComponentView {
         // from dispatchAction.
     }
 
+    private _lastHightItemDataIndex = 0;
+    private _lastHightItemSeriesIndex = 0;
+
     private _showSeriesItemTooltip(
         e: TryShowParams,
         dispatcher: ECElement,
@@ -697,11 +700,20 @@ class TooltipView extends ComponentView {
                 x: e && e.offsetX,
                 y: e && e.offsetY
             });
+            if (this._lastHightItemDataIndex !== dataIndex || this._lastHightItemSeriesIndex !== seriesIndex) {
+                dispatchAction({
+                    type: 'downplay',
+                    dataIndex: this._lastHightItemDataIndex,
+                    seriesIndex: this._lastHightItemSeriesIndex,
+                });
+            }
             dispatchAction({
                 type: 'highlight',
                 dataIndex,
                 seriesIndex
             });
+            this._lastHightItemDataIndex = dataIndex;
+            this._lastHightItemSeriesIndex = seriesIndex;
         }
 
         const params = dataModel.getDataParams(dataIndex, dataType);
@@ -1092,10 +1104,16 @@ class TooltipView extends ComponentView {
         // FIXME
         // duplicated hideTip if manuallyHideTip is called from dispatchAction.
         this._lastDataByCoordSys = null;
+        const ecModel = this._ecModel;
         dispatchAction({
             type: 'hideTip',
             from: this.uid
         });
+        // dispatchAction({
+        //     type: 'downplay',
+        //     seriesIndex: ecModel.getCurrentSeriesIndices(),
+        //     dataIndex: 2
+        // });
     }
 
     dispose(ecModel: GlobalModel, api: ExtensionAPI) {

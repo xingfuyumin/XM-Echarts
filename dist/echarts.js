@@ -56550,6 +56550,7 @@ var AxisPointerView2 = class extends Component_default2 {
     const tooltipTrigger = globalTooltipModel && globalTooltipModel.get("trigger");
     register("axisPointer", api2, function(currTrigger, e2, dispatchAction3) {
       if (triggerOn !== "none" && (currTrigger === "leave" || triggerOn.indexOf(currTrigger) >= 0)) {
+        console.log(111);
         dispatchAction3({
           type: "updateAxisPointer",
           currTrigger,
@@ -62069,6 +62070,8 @@ var TooltipView2 = class extends Component_default2 {
   constructor() {
     super(...arguments);
     this.type = TooltipView2.type;
+    this._lastHightItemDataIndex = 0;
+    this._lastHightItemSeriesIndex = 0;
   }
   _convertToPixel(chart, seriesIndex, dataIndex, x) {
     return chart?.convertToPixel({seriesIndex, dataIndex}, [x, 0]);
@@ -62385,11 +62388,20 @@ var TooltipView2 = class extends Component_default2 {
         x: e2 && e2.offsetX,
         y: e2 && e2.offsetY
       });
+      if (this._lastHightItemDataIndex !== dataIndex || this._lastHightItemSeriesIndex !== seriesIndex) {
+        dispatchAction3({
+          type: "downplay",
+          dataIndex: this._lastHightItemDataIndex,
+          seriesIndex: this._lastHightItemSeriesIndex
+        });
+      }
       dispatchAction3({
         type: "highlight",
         dataIndex,
         seriesIndex
       });
+      this._lastHightItemDataIndex = dataIndex;
+      this._lastHightItemSeriesIndex = seriesIndex;
     }
     const params = dataModel.getDataParams(dataIndex, dataType);
     const markupStyleCreator = new TooltipMarkupStyleCreator();
@@ -62621,6 +62633,7 @@ var TooltipView2 = class extends Component_default2 {
   }
   _hide(dispatchAction3) {
     this._lastDataByCoordSys = null;
+    const ecModel = this._ecModel;
     dispatchAction3({
       type: "hideTip",
       from: this.uid
