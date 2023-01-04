@@ -83677,15 +83677,15 @@
         // FIXME
         // duplicated hideTip if manuallyHideTip is called from dispatchAction.
         this._lastDataByCoordSys = null;
-        var ecModel = this._ecModel;
         dispatchAction({
           type: 'hideTip',
           from: this.uid
-        }); // dispatchAction({
-        //     type: 'downplay',
-        //     seriesIndex: ecModel.getCurrentSeriesIndices(),
-        //     dataIndex: 2
-        // });
+        });
+        dispatchAction({
+          type: 'downplay',
+          dataIndex: this._lastHightItemDataIndex,
+          seriesIndex: this._lastHightItemSeriesIndex
+        });
       };
 
       TooltipView.prototype.dispose = function (ecModel, api) {

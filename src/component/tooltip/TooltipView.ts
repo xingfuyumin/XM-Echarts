@@ -704,7 +704,7 @@ class TooltipView extends ComponentView {
                 dispatchAction({
                     type: 'downplay',
                     dataIndex: this._lastHightItemDataIndex,
-                    seriesIndex: this._lastHightItemSeriesIndex,
+                    seriesIndex: this._lastHightItemSeriesIndex
                 });
             }
             dispatchAction({
@@ -1104,16 +1104,15 @@ class TooltipView extends ComponentView {
         // FIXME
         // duplicated hideTip if manuallyHideTip is called from dispatchAction.
         this._lastDataByCoordSys = null;
-        const ecModel = this._ecModel;
         dispatchAction({
             type: 'hideTip',
             from: this.uid
         });
-        // dispatchAction({
-        //     type: 'downplay',
-        //     seriesIndex: ecModel.getCurrentSeriesIndices(),
-        //     dataIndex: 2
-        // });
+        dispatchAction({
+            type: 'downplay',
+            dataIndex: this._lastHightItemDataIndex,
+            seriesIndex: this._lastHightItemSeriesIndex
+        });
     }
 
     dispose(ecModel: GlobalModel, api: ExtensionAPI) {
