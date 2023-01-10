@@ -469,7 +469,8 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
         context.font = textFont || '12px';
         const len = context.measureText(name).width;
         // 计算Y轴高度，超过的话需要出现"..."
-        const maxLen = Math.min(len, extent[1] - extent[0], maxWidth || Number.MAX_VALUE); // Y轴名称最大高度
+        const maxLen = Math.min(extent[1] - extent[0], maxWidth || Number.MAX_VALUE); // Y轴名称最大高度
+        const matchLen = Math.min(len, extent[1] - extent[0], maxWidth || Number.MAX_VALUE); // Y轴名称最大高度
         // 检查是否有方字体
         const hasChinese = !!name.split('').find((char) => {
             const w = context.measureText(char).width;
@@ -481,8 +482,9 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
             silent: AxisBuilder.isLabelSilent(axisModel),
             rotation: needLabelVertical ? hasChinese ? -PI : -PI * 2 : labelLayout.rotation
         }) as AxisLabelGroup;
-        const baseX = (isY && nameLocation === 'start') || (!isY && nameLocation === 'end')
-            ? -maxLen : isNameLocationCenter(nameLocation) ? maxLen / -2 : 0;
+        const baseX = (isY && nameLocation === 'start') ? -matchLen
+        : (isY && nameLocation === 'end') ? extent[0]
+        : isNameLocationCenter(nameLocation) ? matchLen / -2 : 0;
         let x = 0;
         if (needLabelVertical) {
             const ellipsisWidth = context.measureText('...').width;
@@ -517,7 +519,7 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
                 x += w;
             });
             // 超长后需要在后面拼接"..."
-            if (len > maxLen) {
+            if (len > matchLen) {
                 groupEl.add(new graphic.Text({
                     x: baseX + x,
                     y: 0,
