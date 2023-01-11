@@ -31,20 +31,26 @@ const option2 = {
   },
   xAxis: {
     type: 'category',
+    axisLine: {
+      show: false,
+    },
     data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    name: 'Erdan for findشكرا لك على سبة لي .ing me something to',
+    name: 'Erdan for find',
     nameLocation: 'center'
   },
   yAxis: [{
     type: 'value',
-    name: 'Thank Erdan for findشكرا لك على سبة لي .ing me something to d',
-    nameLocation: 'center',
+    name: 'Thank Erdan for find',
+    nameLocation: 'middle',
     nameVertical: true,
+    // nameGap: 20,
   }, {
     type: 'value',
     name: '感谢二蛋给Thank Erdan for findشكرا لك على سبة لي .ing me something to do我找العمل بالن事做',
     nameVertical: true,
-    nameLocation: 'center'
+    nameLocation: 'middle',
+
+    // nameGap: 40,
   }, ],
   series: [
     {
@@ -64,14 +70,18 @@ const option3 =
   grid: {
     containLabel: true
   },
-  xAxis: {},
+  xAxis: {
+    axisLine: {
+      show: false,
+    }
+  },
   yAxis: [{
     type: 'value',
-    name: '感谢二蛋给Thank Erdan for findشكرا لك على سبة لي .ing me something to do我找العمل بالن事做',
-    nameLocation: 'center',
+    name: '感谢二蛋dddddddddccweecewcdd',
+    nameLocation: 'middle',
     nameVertical: true,
     nameGap: 0,
-    position: 'right',
+    position: 'left',
   }],
   series: [
     {
@@ -105,6 +115,6 @@ const option3 =
   ]
 }
 
-myChart.setOption(option);
+// myChart.setOption(option);
 myChart2.setOption(option2);
-myChart3.setOption(option3);
+// myChart3.setOption(option3);

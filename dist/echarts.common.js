@@ -47089,6 +47089,8 @@
         }
       },
       axisName: function (opt, axisModel, group, transformGroup, api) {
+        var _a;
+
         var name = retrieve(opt.axisName, axisModel.get('name'));
 
         if (!name) {
@@ -47099,9 +47101,13 @@
         var nameVertical = axisModel.get('nameVertical');
         var nameDirection = opt.nameDirection;
         var textStyleModel = axisModel.getModel('nameTextStyle');
-        var gap = axisModel.get('nameGap') || 0;
-        var axisLine = axisModel.get('axisLine'); // axisLine.show=true时boundingRect.width包含opt.labelOffset
-        // 需要提前计算好这些信息后面用做判断
+        var gap = axisModel.get('nameGap') || 0; // x轴axisLine.show=true时y轴的boundingRect.width包含opt.labelOffset
+
+        var axisLineShow = (_a = api.getOption().xAxis) === null || _a === void 0 ? void 0 : _a.some(function (item) {
+          var _a;
+
+          return (_a = item.axisLine) === null || _a === void 0 ? void 0 : _a.show;
+        }); // 需要提前计算好这些信息后面用做判断
         // Y轴标签容器，用来计算标签左右侧起始位置
 
         var boundingRect = group.getBoundingRect(); // 判断是否Y轴，X轴不需要启用文本竖直排列
@@ -47117,7 +47123,7 @@
         var gapSignal = extent[0] > extent[1] ? -1 : 1;
         var pos = [nameLocation === 'start' ? extent[0] - gapSignal * gap : nameLocation === 'end' ? extent[1] + gapSignal * gap : (extent[0] + extent[1]) / 2, // 计算标签起始位置，默认Y轴刻度往左右各偏移一个字符的距离
         // opt.labelOffset是0刻度到左侧的距离（不包含刻度值）
-        needLabelVertical ? ((axisLine === null || axisLine === void 0 ? void 0 : axisLine.show) ? 0 : opt.labelOffset + nameDirection * gap - nameDirection * fontSize / 2) + (labelHorizontalPosition ? -boundingRect.width : boundingRect.width + fontSize) : isNameLocationCenter(nameLocation) ? opt.labelOffset + nameDirection * gap : 0];
+        needLabelVertical ? (axisLineShow ? nameDirection * gap : opt.labelOffset + nameDirection * gap) + (labelHorizontalPosition ? -boundingRect.width : boundingRect.width + fontSize) : isNameLocationCenter(nameLocation) ? opt.labelOffset + nameDirection * gap : 0];
         var labelLayout;
         var nameRotation = axisModel.get('nameRotate');
 
@@ -47165,7 +47171,9 @@
         context.font = textFont || '12px';
         var len = context.measureText(name).width; // 计算Y轴高度，超过的话需要出现"..."
 
-        var maxLen = Math.min(len, extent[1] - extent[0], maxWidth || Number.MAX_VALUE); // Y轴名称最大高度
+        var maxLen = Math.min(extent[1] - extent[0], maxWidth || Number.MAX_VALUE); // Y轴名称最大高度
+
+        var matchLen = Math.min(len, extent[1] - extent[0], maxWidth || Number.MAX_VALUE); // Y轴名称最大高度
         // 检查是否有方字体
 
         var hasChinese = !!name.split('').find(function (char) {
@@ -47178,7 +47186,7 @@
           silent: AxisBuilder.isLabelSilent(axisModel),
           rotation: needLabelVertical ? hasChinese ? -PI$5 : -PI$5 * 2 : labelLayout.rotation
         });
-        var baseX = isY && nameLocation === 'start' || !isY && nameLocation === 'end' ? -maxLen : isNameLocationCenter(nameLocation) ? maxLen / -2 : 0;
+        var baseX = isY && nameLocation === 'start' ? labelHorizontalPosition ? 0 : -matchLen : isY && nameLocation === 'end' ? labelHorizontalPosition ? -matchLen : extent[0] : isNameLocationCenter(nameLocation) ? matchLen / -2 : 0;
         var x = 0;
 
         if (needLabelVertical) {
@@ -47215,7 +47223,7 @@
             x += w;
           }); // 超长后需要在后面拼接"..."
 
-          if (len > maxLen) {
+          if (len > matchLen) {
             groupEl.add(new ZRText({
               x: baseX + x,
               y: 0,

@@ -385,8 +385,8 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
         const nameDirection = opt.nameDirection;
         const textStyleModel = axisModel.getModel('nameTextStyle');
         const gap = axisModel.get('nameGap') || 0;
-        const axisLine = axisModel.get('axisLine'); // axisLine.show=true时boundingRect.width包含opt.labelOffset
-
+        // x轴axisLine.show=true时y轴的boundingRect.width包含opt.labelOffset
+        const axisLineShow = (api.getOption().xAxis as any[])?.some((item: any) => item.axisLine?.show);
         // 需要提前计算好这些信息后面用做判断
         // Y轴标签容器，用来计算标签左右侧起始位置
         const boundingRect = group.getBoundingRect();
@@ -408,8 +408,8 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
                     : (extent[0] + extent[1]) / 2, // 'middle'
             // 计算标签起始位置，默认Y轴刻度往左右各偏移一个字符的距离
             // opt.labelOffset是0刻度到左侧的距离（不包含刻度值）
-            needLabelVertical ? (axisLine?.show ? 0
-                : opt.labelOffset + nameDirection * gap - nameDirection * fontSize / 2)
+            needLabelVertical ? (axisLineShow ? nameDirection * gap
+                : opt.labelOffset + nameDirection * gap)
                 + (labelHorizontalPosition ? -boundingRect.width : boundingRect.width + fontSize)
                 : isNameLocationCenter(nameLocation) ? opt.labelOffset + nameDirection * gap : 0
         ];
@@ -482,8 +482,8 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
             silent: AxisBuilder.isLabelSilent(axisModel),
             rotation: needLabelVertical ? hasChinese ? -PI : -PI * 2 : labelLayout.rotation
         }) as AxisLabelGroup;
-        const baseX = (isY && nameLocation === 'start') ? -matchLen
-        : (isY && nameLocation === 'end') ? extent[0]
+        const baseX = (isY && nameLocation === 'start') ? labelHorizontalPosition ? 0 : -matchLen
+        : (isY && nameLocation === 'end') ? labelHorizontalPosition ? -matchLen : extent[0]
         : isNameLocationCenter(nameLocation) ? matchLen / -2 : 0;
         let x = 0;
         if (needLabelVertical) {
