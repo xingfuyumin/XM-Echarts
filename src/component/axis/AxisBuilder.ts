@@ -408,19 +408,11 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
                     : (extent[0] + extent[1]) / 2, // 'middle'
             // 计算标签起始位置，默认Y轴刻度往左右各偏移一个字符的距离
             // opt.labelOffset是0刻度到左侧的距离（不包含刻度值）
-            needLabelVertical ? nameDirection * boundingRect.width
-            + (axisLine?.show && !labelHorizontalPosition ? nameDirection * gap - fontSize : nameDirection * gap)
-            + (labelHorizontalPosition || axisLine?.show ? fontSize : 0)
-            + nameDirection * fontSize
-            : isY ? 0 : opt.labelOffset + gapSignal * gap
+            needLabelVertical ? (axisLine?.show ? 0
+                : opt.labelOffset + nameDirection * gap - nameDirection * fontSize / 2)
+                + (labelHorizontalPosition ? -boundingRect.width : boundingRect.width + fontSize)
+                : isNameLocationCenter(nameLocation) ? opt.labelOffset + nameDirection * gap : 0
         ];
-        // console.log('gap', gap);
-        // console.log('gap', gap);
-        // console.log('nameDirection', nameDirection);
-        // console.log('axisLine?.show',  axisLine?.show);
-        // console.log('opt.labelOffset', opt.labelOffset);
-        // console.log('boundingRect', boundingRect);
-        // console.log('pos', pos, axisModel);
 
         let labelLayout;
 
@@ -490,8 +482,8 @@ const builders: Record<'axisLine' | 'axisTickLabel' | 'axisName', AxisElementsBu
             silent: AxisBuilder.isLabelSilent(axisModel),
             rotation: needLabelVertical ? hasChinese ? -PI : -PI * 2 : labelLayout.rotation
         }) as AxisLabelGroup;
-        const baseX = (isY && nameLocation === 'start') ? (hasChinese ? -matchLen : 0)
-        : (isY && nameLocation === 'end') ? (hasChinese ? extent[0] : -matchLen)
+        const baseX = (isY && nameLocation === 'start') ? -matchLen
+        : (isY && nameLocation === 'end') ? extent[0]
         : isNameLocationCenter(nameLocation) ? matchLen / -2 : 0;
         let x = 0;
         if (needLabelVertical) {
